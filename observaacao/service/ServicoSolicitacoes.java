@@ -76,6 +76,37 @@ public class ServicoSolicitacoes {
         );
     }
 
+    public Solicitacao registrarSolicitacao(
+        Usuario usuario,
+        boolean anonimo,
+        Categoria categoria,
+        String descricao,
+        String localizacao,
+        Prioridade prioridade
+    ) {
+        validarCategoria(categoria);
+        boolean anonimatoObrigatorio = servicoAnonimato.deveSerAnonimo(
+            categoria
+        );
+        boolean registroAnonimo = anonimo || anonimatoObrigatorio;
+        validarCamposSolicitacao(descricao, localizacao, prioridade);
+        Usuario solicitante = criarSolicitanteAutenticado(
+            usuario,
+            registroAnonimo
+        );
+        Solicitacao solicitacao = criarSolicitacao(
+            solicitante,
+            categoria,
+            descricao,
+            localizacao,
+            prioridade,
+            registroAnonimo,
+            LocalDateTime.now()
+        );
+        filaAtendimento.adicionar(solicitacao);
+        return solicitacao;
+    }
+
     public Solicitacao registrarSolicitacaoComData(
         String nomeUsuario,
         String contato,
@@ -95,6 +126,21 @@ public class ServicoSolicitacoes {
             localizacao,
             prioridade,
             validarDataAbertura(dataAbertura)
+        );
+    }
+
+    public void atualizarStatus(
+        Usuario usuarioResponsavel,
+        String protocolo,
+        StatusSolicitacao novoStatus,
+        String comentario
+    ) {
+        validarUsuarioResponsavel(usuarioResponsavel);
+        atualizarStatus(
+            protocolo,
+            novoStatus,
+            usuarioResponsavel.getNome(),
+            comentario
         );
     }
 
@@ -229,6 +275,21 @@ public class ServicoSolicitacoes {
         return new Usuario(nomeUsuario, contato, TipoUsuario.CIDADAO, false);
     }
 
+    private Usuario criarSolicitanteAutenticado(
+        Usuario usuario,
+        boolean anonimo
+    ) {
+        if (anonimo) {
+            return servicoAnonimato.criarUsuarioAnonimo();
+        }
+        if (usuario == null) {
+            throw new IllegalArgumentException(
+                "O usuario autenticado e obrigatorio para registro identificado."
+            );
+        }
+        return usuario;
+    }
+
     private void validarCamposSolicitacao(
         String descricao,
         String localizacao,
@@ -319,6 +380,19 @@ public class ServicoSolicitacoes {
     private void validarNovoStatus(StatusSolicitacao novoStatus) {
         if (novoStatus == null) {
             throw new IllegalArgumentException("O novo status é obrigatório.");
+        }
+    }
+
+    private void validarUsuarioResponsavel(Usuario usuarioResponsavel) {
+        if (usuarioResponsavel == null) {
+            throw new IllegalArgumentException(
+                "O usuario responsavel e obrigatorio."
+            );
+        }
+        if (usuarioResponsavel.getTipo() != TipoUsuario.SERVIDOR) {
+            throw new IllegalArgumentException(
+                "Apenas servidores podem atualizar status."
+            );
         }
     }
 

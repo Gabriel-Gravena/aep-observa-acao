@@ -9,10 +9,12 @@ import observaacao.model.enums.Prioridade;
 import observaacao.model.enums.StatusSolicitacao;
 import observaacao.model.enums.TipoUsuario;
 import observaacao.repository.RepositorioSolicitacoes;
+import observaacao.repository.RepositorioUsuarios;
 import observaacao.service.FilaAtendimento;
 import observaacao.service.GeradorProtocolo;
 import observaacao.service.ServicoAnonimato;
 import observaacao.service.ServicoSolicitacoes;
+import observaacao.service.ServicoUsuarios;
 import observaacao.ui.MenuCLI;
 
 public class Main {
@@ -23,9 +25,13 @@ public class Main {
 
     public static void main(String[] args) {
         RepositorioSolicitacoes repositorio = new RepositorioSolicitacoes();
+        RepositorioUsuarios repositorioUsuarios = new RepositorioUsuarios();
         FilaAtendimento filaAtendimento = new FilaAtendimento(repositorio);
         GeradorProtocolo geradorProtocolo = new GeradorProtocolo();
         ServicoAnonimato servicoAnonimato = new ServicoAnonimato();
+        ServicoUsuarios servicoUsuarios = new ServicoUsuarios(
+            repositorioUsuarios
+        );
         ServicoSolicitacoes servicoSolicitacoes = new ServicoSolicitacoes(
             repositorio,
             filaAtendimento,
@@ -34,20 +40,24 @@ public class Main {
         );
 
         popularDadosIniciais(
+            servicoUsuarios,
             filaAtendimento,
             geradorProtocolo,
             servicoAnonimato
         );
 
-        MenuCLI menuCLI = new MenuCLI(servicoSolicitacoes);
+        MenuCLI menuCLI = new MenuCLI(servicoSolicitacoes, servicoUsuarios);
         menuCLI.iniciar();
     }
 
     private static void popularDadosIniciais(
+        ServicoUsuarios servicoUsuarios,
         FilaAtendimento filaAtendimento,
         GeradorProtocolo geradorProtocolo,
         ServicoAnonimato servicoAnonimato
     ) {
+        cadastrarUsuariosIniciais(servicoUsuarios);
+
         adicionarSolicitacao(
             filaAtendimento,
             criarSolicitacaoAnonima(
@@ -100,6 +110,32 @@ public class Main {
         adicionarSolicitacao(
             filaAtendimento,
             criarSolicitacaoAtrasada(geradorProtocolo)
+        );
+    }
+
+    private static void cadastrarUsuariosIniciais(
+        ServicoUsuarios servicoUsuarios
+    ) {
+        servicoUsuarios.cadastrarUsuario(
+            "Marcos Lima",
+            "44999990001",
+            "marcos",
+            "1234",
+            TipoUsuario.CIDADAO
+        );
+        servicoUsuarios.cadastrarUsuario(
+            SERVIDOR_JOANA,
+            "joana@prefeitura.gov",
+            "joana",
+            "1234",
+            TipoUsuario.SERVIDOR
+        );
+        servicoUsuarios.cadastrarUsuario(
+            SERVIDOR_CARLOS,
+            "carlos@prefeitura.gov",
+            "carlos",
+            "1234",
+            TipoUsuario.SERVIDOR
         );
     }
 

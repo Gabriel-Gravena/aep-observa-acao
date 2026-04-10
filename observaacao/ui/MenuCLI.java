@@ -7,17 +7,20 @@ import java.util.Scanner;
 import observaacao.model.Categoria;
 import observaacao.model.HistoricoStatus;
 import observaacao.model.Solicitacao;
+import observaacao.model.Usuario;
 import observaacao.model.enums.Prioridade;
 import observaacao.model.enums.StatusSolicitacao;
+import observaacao.model.enums.TipoUsuario;
 import observaacao.service.ServicoSolicitacoes;
+import observaacao.service.ServicoUsuarios;
 
 public class MenuCLI {
 
     private static final String LINHA =
         "=========================================";
-    private static final String TITULO = "  ObservaAção — Sistema de Demandas";
+    private static final String TITULO = "  ObservaAcao - Sistema de Demandas";
     private static final String MENSAGEM_SAIDA =
-        "Encerrando o sistema. Até logo!";
+        "Encerrando o sistema. Ate logo!";
     private static final String MENSAGEM_CONTINUAR =
         "Pressione Enter para voltar ao menu...";
     private static final String BAIRRO_TODOS = "TODOS";
@@ -29,20 +32,64 @@ public class MenuCLI {
     private static final DateTimeFormatter FORMATADOR_DATA_HORA =
         DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
 
-    private enum OpcaoMenu {
-        REGISTRAR(1, "Registrar nova solicitação"),
-        ACOMPANHAR(2, "Acompanhar solicitação (buscar por protocolo)"),
-        HISTORICO(3, "Ver histórico completo de solicitação"),
-        LISTAR_FILA(4, "Listar fila de atendimento (por prioridade)"),
-        ATUALIZAR_STATUS(5, "Atualizar status de solicitação"),
-        LISTAR_ATRASADAS(6, "Listar demandas atrasadas"),
-        FILTRAR(7, "Filtrar por bairro e categoria"),
-        SAIR(8, "Sair");
+    private enum OpcaoInicial {
+        LOGIN(1, "Login"),
+        REGISTRO(2, "Registro"),
+        SAIR(3, "Sair");
 
         private final int codigo;
         private final String descricao;
 
-        OpcaoMenu(int codigo, String descricao) {
+        OpcaoInicial(int codigo, String descricao) {
+            this.codigo = codigo;
+            this.descricao = descricao;
+        }
+
+        public int getCodigo() {
+            return codigo;
+        }
+
+        public String getDescricao() {
+            return descricao;
+        }
+    }
+
+    private enum OpcaoCidadao {
+        REGISTRAR(1, "Registrar nova solicitacao"),
+        ACOMPANHAR(2, "Acompanhar solicitacao (buscar por protocolo)"),
+        HISTORICO(3, "Ver historico completo de solicitacao"),
+        LOGOUT(4, "Sair da conta");
+
+        private final int codigo;
+        private final String descricao;
+
+        OpcaoCidadao(int codigo, String descricao) {
+            this.codigo = codigo;
+            this.descricao = descricao;
+        }
+
+        public int getCodigo() {
+            return codigo;
+        }
+
+        public String getDescricao() {
+            return descricao;
+        }
+    }
+
+    private enum OpcaoServidor {
+        ACOMPANHAR(1, "Acompanhar solicitacao (buscar por protocolo)"),
+        HISTORICO(2, "Ver historico completo de solicitacao"),
+        LISTAR_FILA(3, "Listar fila de atendimento (por prioridade)"),
+        ATUALIZAR_STATUS(4, "Atualizar status de solicitacao"),
+        LISTAR_ATRASADAS(5, "Listar demandas atrasadas"),
+        FILTRAR(6, "Filtrar por bairro e categoria"),
+        LOGOUT(7, "Sair da conta");
+
+        private final int codigo;
+        private final String descricao;
+
+        OpcaoServidor(int codigo, String descricao) {
             this.codigo = codigo;
             this.descricao = descricao;
         }
@@ -57,91 +104,237 @@ public class MenuCLI {
     }
 
     private final ServicoSolicitacoes servicoSolicitacoes;
+    private final ServicoUsuarios servicoUsuarios;
     private final Scanner scanner;
+    private Usuario usuarioLogado;
 
-    public MenuCLI(ServicoSolicitacoes servicoSolicitacoes) {
-        this(servicoSolicitacoes, new Scanner(System.in));
+    public MenuCLI(
+        ServicoSolicitacoes servicoSolicitacoes,
+        ServicoUsuarios servicoUsuarios
+    ) {
+        this(servicoSolicitacoes, servicoUsuarios, new Scanner(System.in));
     }
 
-    public MenuCLI(ServicoSolicitacoes servicoSolicitacoes, Scanner scanner) {
+    public MenuCLI(
+        ServicoSolicitacoes servicoSolicitacoes,
+        ServicoUsuarios servicoUsuarios,
+        Scanner scanner
+    ) {
         if (servicoSolicitacoes == null) {
             throw new IllegalArgumentException(
-                "O serviço de solicitações é obrigatório."
+                "O servico de solicitacoes e obrigatorio."
+            );
+        }
+        if (servicoUsuarios == null) {
+            throw new IllegalArgumentException(
+                "O servico de usuarios e obrigatorio."
             );
         }
         if (scanner == null) {
-            throw new IllegalArgumentException("O scanner é obrigatório.");
+            throw new IllegalArgumentException("O scanner e obrigatorio.");
         }
         this.servicoSolicitacoes = servicoSolicitacoes;
+        this.servicoUsuarios = servicoUsuarios;
         this.scanner = scanner;
     }
 
     public void iniciar() {
         boolean executando = true;
         while (executando) {
+            if (usuarioLogado == null) {
+                limparTela();
+                exibirMenuInicial();
+                executando = processarOpcaoInicial(lerOpcao());
+                if (executando && usuarioLogado == null) {
+                    aguardarContinuacao();
+                }
+            } else {
+                executarSessaoUsuario();
+            }
+        }
+    }
+
+    private void executarSessaoUsuario() {
+        boolean sessaoAtiva = true;
+        while (sessaoAtiva && usuarioLogado != null) {
             limparTela();
-            exibirMenu();
-            executando = processarOpcao(lerOpcao());
-            if (executando) {
+            if (usuarioLogadoEhServidor()) {
+                exibirMenuServidor();
+                sessaoAtiva = processarOpcaoServidor(lerOpcao());
+            } else {
+                exibirMenuCidadao();
+                sessaoAtiva = processarOpcaoCidadao(lerOpcao());
+            }
+            if (sessaoAtiva && usuarioLogado != null) {
                 aguardarContinuacao();
             }
         }
     }
 
-    private void exibirMenu() {
-        OpcaoMenu[] opcoes = OpcaoMenu.values();
-        int i = 0;
+    private void exibirMenuInicial() {
+        exibirCabecalho("Acesso ao sistema");
+        exibirOpcoesIniciais();
+        System.out.println();
+        System.out.print("Opcao: ");
+    }
 
+    private void exibirMenuCidadao() {
+        exibirCabecalhoSessao("Menu do cidadao");
+        exibirOpcoesCidadao();
+        System.out.println();
+        System.out.print("Opcao: ");
+    }
+
+    private void exibirMenuServidor() {
+        exibirCabecalhoSessao("Menu do servidor");
+        exibirOpcoesServidor();
+        System.out.println();
+        System.out.print("Opcao: ");
+    }
+
+    private void exibirCabecalho(String titulo) {
         System.out.println();
         System.out.println(LINHA);
         System.out.println(TITULO);
         System.out.println(LINHA);
+        System.out.println(" " + titulo);
+        System.out.println(LINHA);
         System.out.println();
-
-        while (i < opcoes.length) {
-            exibirOpcaoMenu(opcoes[i]);
-            i++;
-        }
-
-        System.out.println();
-        System.out.print("Opção: ");
     }
 
-    private boolean processarOpcao(int opcao) {
-        if (opcao == OpcaoMenu.REGISTRAR.getCodigo()) {
-            registrarNovaSolicitacao();
+    private void exibirCabecalhoSessao(String titulo) {
+        exibirCabecalho(titulo);
+        System.out.println("Usuario: " + usuarioLogado.getNome());
+        System.out.println("Perfil: " + descreverTipoUsuario(usuarioLogado));
+        System.out.println();
+    }
+
+    private boolean processarOpcaoInicial(int opcao) {
+        if (opcao == OpcaoInicial.LOGIN.getCodigo()) {
+            fazerLogin();
             return true;
         }
-        if (opcao == OpcaoMenu.ACOMPANHAR.getCodigo()) {
-            acompanharSolicitacao();
+        if (opcao == OpcaoInicial.REGISTRO.getCodigo()) {
+            registrarUsuario();
             return true;
         }
-        if (opcao == OpcaoMenu.HISTORICO.getCodigo()) {
-            verHistoricoCompleto();
-            return true;
-        }
-        if (opcao == OpcaoMenu.LISTAR_FILA.getCodigo()) {
-            listarFilaAtendimento();
-            return true;
-        }
-        if (opcao == OpcaoMenu.ATUALIZAR_STATUS.getCodigo()) {
-            atualizarStatusSolicitacao();
-            return true;
-        }
-        if (opcao == OpcaoMenu.LISTAR_ATRASADAS.getCodigo()) {
-            listarDemandasAtrasadas();
-            return true;
-        }
-        if (opcao == OpcaoMenu.FILTRAR.getCodigo()) {
-            filtrarPorBairroECategoria();
-            return true;
-        }
-        if (opcao == OpcaoMenu.SAIR.getCodigo()) {
+        if (opcao == OpcaoInicial.SAIR.getCodigo()) {
             System.out.println(MENSAGEM_SAIDA);
             return false;
         }
-        System.out.println("Opção inválida. Escolha um número entre 1 e 8.");
+        System.out.println("Opcao invalida. Escolha um numero entre 1 e 3.");
         return true;
+    }
+
+    private boolean processarOpcaoCidadao(int opcao) {
+        if (opcao == OpcaoCidadao.REGISTRAR.getCodigo()) {
+            registrarNovaSolicitacao();
+            return true;
+        }
+        if (opcao == OpcaoCidadao.ACOMPANHAR.getCodigo()) {
+            acompanharSolicitacao();
+            return true;
+        }
+        if (opcao == OpcaoCidadao.HISTORICO.getCodigo()) {
+            verHistoricoCompleto();
+            return true;
+        }
+        if (opcao == OpcaoCidadao.LOGOUT.getCodigo()) {
+            encerrarSessao();
+            return false;
+        }
+        System.out.println("Opcao invalida. Escolha um numero entre 1 e 4.");
+        return true;
+    }
+
+    private boolean processarOpcaoServidor(int opcao) {
+        if (opcao == OpcaoServidor.ACOMPANHAR.getCodigo()) {
+            acompanharSolicitacao();
+            return true;
+        }
+        if (opcao == OpcaoServidor.HISTORICO.getCodigo()) {
+            verHistoricoCompleto();
+            return true;
+        }
+        if (opcao == OpcaoServidor.LISTAR_FILA.getCodigo()) {
+            listarFilaAtendimento();
+            return true;
+        }
+        if (opcao == OpcaoServidor.ATUALIZAR_STATUS.getCodigo()) {
+            atualizarStatusSolicitacao();
+            return true;
+        }
+        if (opcao == OpcaoServidor.LISTAR_ATRASADAS.getCodigo()) {
+            listarDemandasAtrasadas();
+            return true;
+        }
+        if (opcao == OpcaoServidor.FILTRAR.getCodigo()) {
+            filtrarPorBairroECategoria();
+            return true;
+        }
+        if (opcao == OpcaoServidor.LOGOUT.getCodigo()) {
+            encerrarSessao();
+            return false;
+        }
+        System.out.println("Opcao invalida. Escolha um numero entre 1 e 7.");
+        return true;
+    }
+
+    private void fazerLogin() {
+        exibirCabecalhoAcao("Login");
+        try {
+            String login = lerTexto("Login: ");
+            String senha = lerTexto("Senha: ");
+            usuarioLogado = servicoUsuarios.autenticar(login, senha);
+            limparTela();
+            System.out.println(LINHA);
+            System.out.println("Login realizado com sucesso.");
+            System.out.println("Usuario: " + usuarioLogado.getNome());
+            System.out.println("Perfil: " + descreverTipoUsuario(usuarioLogado));
+            System.out.println(LINHA);
+        } catch (IllegalArgumentException e) {
+            usuarioLogado = null;
+            limparTela();
+            System.out.println("Falha no login: " + e.getMessage());
+        }
+    }
+
+    private void registrarUsuario() {
+        exibirCabecalhoAcao("Registro");
+        try {
+            String nome = lerTexto("Nome: ");
+            String contato = lerTexto("Contato (email/telefone, opcional): ");
+            String login = lerTexto("Login: ");
+            String senha = lerTexto("Senha (minimo 4 caracteres): ");
+            TipoUsuario tipoUsuario = lerTipoUsuario(
+                "Perfil [1] Cidadao [2] Servidor: "
+            );
+
+            Usuario usuario = servicoUsuarios.cadastrarUsuario(
+                nome,
+                contato,
+                login,
+                senha,
+                tipoUsuario
+            );
+
+            limparTela();
+            System.out.println(LINHA);
+            System.out.println("Cadastro realizado com sucesso.");
+            System.out.println("Usuario: " + usuario.getNome());
+            System.out.println("Perfil: " + descreverTipoUsuario(usuario));
+            System.out.println("Agora faca login para acessar o sistema.");
+            System.out.println(LINHA);
+        } catch (IllegalArgumentException e) {
+            limparTela();
+            System.out.println("Nao foi possivel concluir o cadastro: " + e.getMessage());
+        }
+    }
+
+    private void encerrarSessao() {
+        limparTela();
+        System.out.println("Sessao encerrada para " + usuarioLogado.getNome() + ".");
+        usuarioLogado = null;
     }
 
     private int lerOpcao() {
@@ -154,23 +347,22 @@ public class MenuCLI {
     }
 
     private void registrarNovaSolicitacao() {
-        exibirCabecalhoAcao("Cadastro de nova solicitação");
+        exibirCabecalhoAcao("Cadastro de nova solicitacao");
         try {
-            String nome = lerTexto("Nome (Enter para anônimo): ");
-            String contato = lerTexto("Contato (email/telefone, opcional): ");
             Categoria categoria = lerCategoria(
                 "Categoria " + categoriasDisponiveis() + ": "
             );
-            String descricao = lerTexto("Descrição (mínimo 20 caracteres): ");
-            String localizacao = lerTexto("Localização/Bairro: ");
+            String descricao = lerTexto("Descricao (minimo 20 caracteres): ");
+            String localizacao = lerTexto("Localizacao/Bairro: ");
             Prioridade prioridade = lerPrioridade(
                 "Prioridade " + prioridadesDisponiveis() + ": "
             );
-            boolean anonimo = nome.isBlank();
+            boolean anonimo = lerConfirmacao(
+                "Registrar de forma anonima? (S/N): "
+            );
 
             Solicitacao solicitacao = servicoSolicitacoes.registrarSolicitacao(
-                nome,
-                contato,
+                usuarioLogado,
                 anonimo,
                 categoria,
                 descricao,
@@ -180,31 +372,33 @@ public class MenuCLI {
 
             exibirResumoCadastro(solicitacao);
         } catch (IllegalArgumentException e) {
+            limparTela();
             System.out.println(
-                "Não foi possível registrar a solicitação: " + e.getMessage()
+                "Nao foi possivel registrar a solicitacao: " + e.getMessage()
             );
         } catch (Exception e) {
+            limparTela();
             System.out.println(
-                "Ocorreu um erro ao processar sua solicitação. Tente novamente."
+                "Ocorreu um erro ao processar sua solicitacao. Tente novamente."
             );
         }
     }
 
     private void acompanharSolicitacao() {
-        exibirCabecalhoAcao("Acompanhar solicitação");
+        exibirCabecalhoAcao("Acompanhar solicitacao");
         String protocolo = lerTexto("Informe o protocolo: ");
         Optional<Solicitacao> solicitacao =
             servicoSolicitacoes.buscarPorProtocolo(protocolo);
         limparTela();
         if (solicitacao.isEmpty()) {
-            System.out.println("Solicitação não encontrada.");
+            System.out.println("Solicitacao nao encontrada.");
             return;
         }
         exibirResumoSolicitacao(solicitacao.get());
     }
 
     private void verHistoricoCompleto() {
-        exibirCabecalhoAcao("Histórico completo");
+        exibirCabecalhoAcao("Historico completo");
         String protocolo = lerTexto("Informe o protocolo: ");
         try {
             String relatorio = servicoSolicitacoes.gerarRelatorioSolicitacao(
@@ -217,7 +411,7 @@ public class MenuCLI {
         } catch (IllegalArgumentException e) {
             limparTela();
             System.out.println(
-                "Não foi possível gerar o histórico: " + e.getMessage()
+                "Nao foi possivel gerar o historico: " + e.getMessage()
             );
         }
     }
@@ -237,31 +431,28 @@ public class MenuCLI {
             StatusSolicitacao novoStatus = lerStatus(
                 "Novo status " + statusDisponiveis() + ": "
             );
-            String responsavel = lerTexto("Nome do responsável: ");
-            String comentario = lerTexto("Comentário obrigatório: ");
+            String comentario = lerTexto("Comentario obrigatorio: ");
             limparTela();
 
             servicoSolicitacoes.atualizarStatus(
+                usuarioLogado,
                 protocolo,
                 novoStatus,
-                responsavel,
                 comentario
             );
-            System.out.println("✔ Status atualizado com sucesso.");
+            System.out.println("Status atualizado com sucesso.");
         } catch (IllegalArgumentException e) {
             limparTela();
-            System.out.println(
-                "Atualização cancelada: " + e.getMessage()
-            );
+            System.out.println("Atualizacao cancelada: " + e.getMessage());
         } catch (IllegalStateException e) {
             limparTela();
-            System.out.println("Transição inválida: " + e.getMessage());
+            System.out.println("Transicao invalida: " + e.getMessage());
             System.out.println(
                 "Tentativa registrada no console para auditoria."
             );
         } catch (Exception e) {
             limparTela();
-            System.out.println("Ocorreu um erro ao atualizar a solicitação.");
+            System.out.println("Ocorreu um erro ao atualizar a solicitacao.");
         }
     }
 
@@ -283,6 +474,7 @@ public class MenuCLI {
             try {
                 categoriaFiltro = interpretarCategoria(categoriaEntrada);
             } catch (IllegalArgumentException e) {
+                limparTela();
                 System.out.println(e.getMessage());
                 return;
             }
@@ -294,7 +486,7 @@ public class MenuCLI {
             fila,
             categoriaFiltro
         );
-        exibirListaSolicitacoes("Solicitações filtradas", filtradas);
+        exibirListaSolicitacoes("Solicitacoes filtradas", filtradas);
     }
 
     private List<Solicitacao> aplicarFiltroCategoria(
@@ -336,12 +528,13 @@ public class MenuCLI {
         limparTela();
         System.out.println();
         System.out.println(LINHA);
-        System.out.println("✔ Solicitação registrada com sucesso!");
+        System.out.println("Solicitacao registrada com sucesso.");
         System.out.println("Protocolo: " + solicitacao.getProtocolo());
         System.out.println(
             "Prazo alvo: " + solicitacao.getPrazoAlvo().format(FORMATADOR_DATA)
         );
         System.out.println("Status: " + solicitacao.getStatus());
+        System.out.println("Modo: " + (solicitacao.isAnonimo() ? "ANONIMO" : "IDENTIFICADO"));
         System.out.println("Guarde seu protocolo para acompanhar o andamento.");
         System.out.println(LINHA);
     }
@@ -359,23 +552,23 @@ public class MenuCLI {
         System.out.println(
             "Prazo alvo: " + solicitacao.getPrazoAlvo().format(FORMATADOR_DATA)
         );
-        System.out.println("Localização: " + solicitacao.getLocalizacao());
+        System.out.println("Localizacao: " + solicitacao.getLocalizacao());
         System.out.println(
-            "Prazo em dia: " + (solicitacao.estaNoPrazo() ? "SIM" : "NÃO")
+            "Prazo em dia: " + (solicitacao.estaNoPrazo() ? "SIM" : "NAO")
         );
-        System.out.println("Descrição: " + solicitacao.getDescricao());
+        System.out.println("Descricao: " + solicitacao.getDescricao());
         exibirHistoricoResumido(solicitacao.getHistorico());
         System.out.println(LINHA);
     }
 
     private void exibirHistoricoResumido(List<HistoricoStatus> historico) {
         if (historico.isEmpty()) {
-            System.out.println("Histórico: nenhuma movimentação registrada.");
+            System.out.println("Historico: nenhuma movimentacao registrada.");
             return;
         }
         HistoricoStatus ultimo = historico.get(historico.size() - 1);
         System.out.println(
-            "Última movimentação: " +
+            "Ultima movimentacao: " +
                 ultimo.getDataMovimentacao().format(FORMATADOR_DATA_HORA) +
                 " | " +
                 ultimo.getResponsavel() +
@@ -396,7 +589,7 @@ public class MenuCLI {
         System.out.println(titulo);
         System.out.println(LINHA);
         if (solicitacoes == null || solicitacoes.isEmpty()) {
-            System.out.println("Nenhuma solicitação encontrada.");
+            System.out.println("Nenhuma solicitacao encontrada.");
             System.out.println(LINHA);
             return;
         }
@@ -427,18 +620,9 @@ public class MenuCLI {
         );
     }
 
-    private String lerTexto(String mensagem) {
-        System.out.print(mensagem);
-        String valor = scanner.nextLine();
-        return valor == null ? ENTRADA_VAZIA : valor.trim();
-    }
-
     private void exibirCabecalhoAcao(String titulo) {
         limparTela();
-        System.out.println();
-        System.out.println(LINHA);
-        System.out.println(" " + titulo);
-        System.out.println(LINHA);
+        exibirCabecalho(titulo);
     }
 
     private void aguardarContinuacao() {
@@ -447,34 +631,40 @@ public class MenuCLI {
         scanner.nextLine();
     }
 
-    private void limparTela() {
-        if (executarComandoLimpeza()) {
-            return;
-        }
-        System.out.print(ANSI_LIMPAR_TELA);
-        System.out.flush();
+    private String lerTexto(String mensagem) {
+        System.out.print(mensagem);
+        String valor = scanner.nextLine();
+        return valor == null ? ENTRADA_VAZIA : valor.trim();
     }
 
-    private boolean executarComandoLimpeza() {
-        String sistemaOperacional = System
-            .getProperty("os.name", "")
-            .toLowerCase();
-        ProcessBuilder processBuilder;
-
-        if (sistemaOperacional.contains("win")) {
-            processBuilder = new ProcessBuilder("cmd", "/c", "cls");
-        } else {
-            processBuilder = new ProcessBuilder("clear");
+    private boolean lerConfirmacao(String mensagem) {
+        String resposta = lerTexto(mensagem);
+        if (
+            "S".equalsIgnoreCase(resposta) ||
+            "SIM".equalsIgnoreCase(resposta)
+        ) {
+            return true;
         }
-
-        processBuilder.inheritIO();
-
-        try {
-            Process processo = processBuilder.start();
-            return processo.waitFor() == 0;
-        } catch (Exception e) {
+        if (
+            "N".equalsIgnoreCase(resposta) ||
+            "NAO".equalsIgnoreCase(resposta)
+        ) {
             return false;
         }
+        throw new IllegalArgumentException("Resposta invalida. Use S ou N.");
+    }
+
+    private TipoUsuario lerTipoUsuario(String mensagem) {
+        String entrada = lerTexto(mensagem);
+        if ("1".equals(entrada) || "CIDADAO".equalsIgnoreCase(entrada)) {
+            return TipoUsuario.CIDADAO;
+        }
+        if ("2".equals(entrada) || "SERVIDOR".equalsIgnoreCase(entrada)) {
+            return TipoUsuario.SERVIDOR;
+        }
+        throw new IllegalArgumentException(
+            "Perfil invalido. Escolha cidadao ou servidor."
+        );
     }
 
     private Prioridade lerPrioridade(String mensagem) {
@@ -483,7 +673,7 @@ public class MenuCLI {
             return Prioridade.valueOf(entrada.toUpperCase());
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException(
-                "Prioridade inválida. Use uma das opções " +
+                "Prioridade invalida. Use uma das opcoes " +
                     prioridadesDisponiveis() +
                     "."
             );
@@ -501,7 +691,7 @@ public class MenuCLI {
             return categoria.get();
         }
         throw new IllegalArgumentException(
-            "Categoria inválida. Use uma das opções " +
+            "Categoria invalida. Use uma das opcoes " +
                 categoriasDisponiveis() +
                 "."
         );
@@ -511,14 +701,14 @@ public class MenuCLI {
         String entrada = lerTexto(mensagem);
         if (entrada.isBlank()) {
             throw new IllegalArgumentException(
-                "Status não informado. Informe um status para continuar."
+                "Status nao informado. Informe um status para continuar."
             );
         }
         try {
             return StatusSolicitacao.valueOf(entrada.toUpperCase());
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException(
-                "Status inválido. Use uma das opções " +
+                "Status invalido. Use uma das opcoes " +
                     statusDisponiveis() +
                     "."
             );
@@ -566,9 +756,84 @@ public class MenuCLI {
         return texto.toString();
     }
 
-    private void exibirOpcaoMenu(OpcaoMenu opcaoMenu) {
-        System.out.println(
-            "  [" + opcaoMenu.getCodigo() + "] " + opcaoMenu.getDescricao()
-        );
+    private void exibirOpcoesIniciais() {
+        OpcaoInicial[] opcoes = OpcaoInicial.values();
+        int i = 0;
+
+        while (i < opcoes.length) {
+            System.out.println(
+                "  [" + opcoes[i].getCodigo() + "] " + opcoes[i].getDescricao()
+            );
+            i++;
+        }
+    }
+
+    private void exibirOpcoesCidadao() {
+        OpcaoCidadao[] opcoes = OpcaoCidadao.values();
+        int i = 0;
+
+        while (i < opcoes.length) {
+            System.out.println(
+                "  [" + opcoes[i].getCodigo() + "] " + opcoes[i].getDescricao()
+            );
+            i++;
+        }
+    }
+
+    private void exibirOpcoesServidor() {
+        OpcaoServidor[] opcoes = OpcaoServidor.values();
+        int i = 0;
+
+        while (i < opcoes.length) {
+            System.out.println(
+                "  [" + opcoes[i].getCodigo() + "] " + opcoes[i].getDescricao()
+            );
+            i++;
+        }
+    }
+
+    private String descreverTipoUsuario(Usuario usuario) {
+        if (usuarioLogadoEhServidor(usuario)) {
+            return "SERVIDOR";
+        }
+        return "CIDADAO";
+    }
+
+    private boolean usuarioLogadoEhServidor() {
+        return usuarioLogadoEhServidor(usuarioLogado);
+    }
+
+    private boolean usuarioLogadoEhServidor(Usuario usuario) {
+        return servicoUsuarios.isServidor(usuario);
+    }
+
+    private void limparTela() {
+        if (executarComandoLimpeza()) {
+            return;
+        }
+        System.out.print(ANSI_LIMPAR_TELA);
+        System.out.flush();
+    }
+
+    private boolean executarComandoLimpeza() {
+        String sistemaOperacional = System
+            .getProperty("os.name", "")
+            .toLowerCase();
+        ProcessBuilder processBuilder;
+
+        if (sistemaOperacional.contains("win")) {
+            processBuilder = new ProcessBuilder("cmd", "/c", "cls");
+        } else {
+            processBuilder = new ProcessBuilder("clear");
+        }
+
+        processBuilder.inheritIO();
+
+        try {
+            Process processo = processBuilder.start();
+            return processo.waitFor() == 0;
+        } catch (Exception e) {
+            return false;
+        }
     }
 }
