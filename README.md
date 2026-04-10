@@ -79,25 +79,26 @@ Resumo dos pacotes:
 - Java JDK 21 ou superior instalado;
 - terminal com suporte a UTF-8 de preferencia.
 
+### Clonar o repositório
+
+Execute no terminal:
+
+```
+git clone https://github.com/Gabriel-Gravena/aep-observa-acao.git
+```
+
 ### Compilar
 
-No PowerShell, na raiz do projeto:
+No terminal, na raiz do projeto(aep-observa-acao):
 
-```powershell
-New-Item -ItemType Directory -Force -Path build | Out-Null
-javac -encoding UTF-8 -d build (Get-ChildItem -Recurse -Filter *.java | ForEach-Object { $_.FullName })
+```cmd
+javac observaacao/Main.java
 ```
 
 ### Executar
 
-```powershell
-java -cp build observaacao.Main
-```
-
-Se o terminal do Windows exibir caracteres estranhos, execute antes:
-
-```powershell
-chcp 65001
+```cmd
+java observaacao/Main.java
 ```
 
 ## Como usar
