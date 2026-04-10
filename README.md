@@ -1,6 +1,6 @@
 # ObservaAcao
 
-Sistema academico em Java para registro e acompanhamento de solicitacoes e demandas publicas. O projeto foi desenvolvido em CLI para o desafio da govtech ficticia **ObservaAcao**, com foco em transparencia, rastreabilidade e reducao de barreiras no acesso a servicos publicos.
+Sistema desenvolvido em Java para registro e acompanhamento de solicitacoes e demandas publicas. O projeto foi desenvolvido em CLI para o desafio da govtech ficticia **ObservaAcao**, com foco em transparencia, rastreabilidade e reducao de barreiras no acesso a servicos publicos.
 
 ## Objetivo
 
