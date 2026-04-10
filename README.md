@@ -38,7 +38,7 @@ O projeto conversa principalmente com os ODS:
 - filtros por bairro e categoria;
 - carga inicial com solicitacoes de exemplo para demonstracao.
 
-## Regras de negocio atuais
+## Regras de negocio
 
 - usuarios do tipo `CIDADAO` acessam o menu de abertura e acompanhamento de solicitacoes;
 - usuarios do tipo `SERVIDOR` acessam o menu operacional de fila e atualizacao de status;
